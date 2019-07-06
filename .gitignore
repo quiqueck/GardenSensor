@@ -1,0 +1,12 @@
+.pio
+.pioenvs
+.piolibdeps
+include/WiFi.h
+server/node_modules
+data.csv
+.vscode/.browse.c_cpp.db
+.vscode/.browse.c_cpp.db-shm
+.vscode/.browse.c_cpp.db-wal
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/settings.json
