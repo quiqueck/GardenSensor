@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <!-- meta -->
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Dataview</title>
+        
+        <link rel="stylesheet" href="/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/css/style.css">
+        <script src="/js/jquery.min.js"></script>
+        <script src="/js/bootstrap.min.js"></script>
+        <script src="/js/d3.js"></script>
+        <script src="/js/moment.js"></script>
+        <style>
+            body {
+                margin:20px;
+            } 
+            .table-area          { 
+                overflow-y: auto; 
+                height:50vh;
+                position: relative;
+                z-index: 0;
+            }
+            .table-area thead th { 
+                position: sticky; 
+                position:-webkit-sticky;
+                top: 0; 
+            }
+
+            .line {
+                fill: none;
+                stroke: silver;
+                stroke-width: 3px;
+            }
+
+            .line0{
+                stroke:red;
+                background-color:red;
+            }
+            .line1{
+                stroke:steelblue;
+                background-color:steelblue;
+            }
+            .line2{
+                stroke:orange;
+                background-color:orange;
+            }
+            .line3{
+                stroke:green;
+                background-color:green;
+            }
+            .line4{
+                stroke:lightblue;
+                background-color:lightblue;
+            }
+
+            .axisSteelBlue text{
+                fill: green;
+            }
+
+            .axisRed text{
+                fill: lightblue;
+            }
+
+            .box {
+                display:inline-block;
+                width:20px;
+                height:20px;  
+                margin-bottom:-2px;              
+            }
+        </style>
+    </head>
+    <body>
+        <div id="content" >            
+            <h1 style="margin-bottom:30px">Datasheet {{VERSION}}</h1>
+            <div class="table-area">
+                <table id="mainTable" class="table table-hover ">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th></th>
+                            <th><div class="box line0"></div> Temperature</th>
+                            <th><div class="box line1"></div> Humidity</th>
+                            <th><div class="box line2"></div> Brightness</th>
+                            <th><div class="box line3"></div> Moisture</th>
+                            <th><div class="box line4"></div> Voltage</th></tr>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
+            </div>
+            <div id="alerts"></div>
+        </div>
+    </body>
+
+    <script type="text/javascript">
+        moment().locale('de');
+        $.get( "/api/001/data/json")
+            .done(function(d) {
+                console.log( "Received", d );
+                let nr = 0;
+                let table = $('#mainTable tbody');
+                let last = 0;
+                $.each(d.data, (idx, row) => {
+                    let date;
+                    if (moment().subtract(1, 'hours').isBefore(row.date)){
+                        date = "&nbsp;&nbsp;&nbsp;&nbsp;" + moment(row.date).locale("de").fromNow();
+                    }  else if (moment(row.date).isSame(last, 'day')){
+                        date = "&nbsp;&nbsp;&nbsp;&nbsp;" + moment(row.date).locale("de").format('LTS');
+                    } else {
+                        date = moment(row.date).locale("de").calendar();
+                    }
+                    last = row.date;
+                    let str = `<tr><td>${date}</td>`;
+                        if (row.temperature!==null && row.temperature!=="undefined") str += `<td>${Math.round(row.temperature*10)/10}&thinsp;°C</td>`;
+                        else str += '<td></td>';
+                        
+                        if (row.humidity!==null && row.humidity!=="undefined") str += `<td>${row.humidity}&thinsp;%</td>`;
+                        else str += '<td></td>';
+
+                        if (row.brightness!==null && row.brightness!=="undefined") str += `<td>${Math.ceil(row.brightness)}&thinsp;lux</td>`;
+                        else str += '<td></td>';
+
+                        if (row.moisture!==null && row.moisture!=="undefined") {
+                            if (row.moisture_cached) {
+                                str += '<td style="color:silver">';
+                            } else {
+                                str += '<td>';
+                            }
+                            str += `${row.moisture}&thinsp;</td>`;
+                        } else str += '<td></td>';
+
+                        if (row.voltage!==null && row.voltage!=="undefined") str += `<td>${row.voltage}&thinsp;</td>`;
+                        else str += '<td></td>';
+
+                        str += '</tr>';
+                        table.prepend(str);
+                    
+                });
+
+                const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage'];
+
+                // set the dimensions and margins of the graph
+                const margin = {top: 20, right: 40, bottom: 30, left: 50},
+                    width = table.innerWidth() - margin.left - margin.right,
+                    height = 500 - margin.top - margin.bottom;
+
+                // set the ranges
+                let x = d3.scaleTime().range([0, width]);
+                let y = [];
+                let valueline = [];
+                for (let i=0; i<5; i++){
+                    y[i] = d3.scaleLinear().range([height, 0]);
+
+                    // define the 1st line
+                    valueline[i] = d3.line()
+                        .x((d) => x(d.date))
+                        .y((d) => y[i](d[columns[i]]));
+                }
+
+                // append the svg obgect to the body of the page
+                // appends a 'group' element to 'svg'
+                // moves the 'group' element to the top left margin
+                var svg = d3.select("body").append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                        .attr(  "transform",
+                                "translate(" + margin.left + "," + margin.top + ")");
+
+                const data = d.data.slice(Math.max(d.data.length - (48*4), 0));
+                // format the data
+                d.data.forEach((d) => {
+                        d.date = new Date(d.date);
+                });
+
+                x.domain(d3.extent(data, d => d.date));
+                for (let i=0; i<5; i++){
+                    y[i].domain([0, d3.max(data, d => Math.max(d[columns[i]]))]);
+
+                     // Add the valueline path.
+                    svg.append("path")
+                        .data([data])
+                        .attr("class", "line line"+i)
+                        .attr("d", valueline[i]);
+                }
+
+                // Add the X Axis
+                svg.append("g")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(x));
+
+                // Add the Y0 Axis
+                svg.append("g")
+                    .attr("class", "axisSteelBlue")
+                    .call(d3.axisLeft(y[3]));
+
+                // Add the Y1 Axis
+                svg.append("g")
+                    .attr("class", "axisRed")
+                    .attr("transform", "translate( " + width + ", 0 )")
+                    .call(d3.axisRight(y[4]));
+            });
+    </script>
+</html>
