@@ -82,7 +82,7 @@ void setup() {
 
 int readSoil(){
     digitalWrite(VOLTAGE_POWER_PIN, LOW);
-    delay(10);
+    delay(100);
     digitalWrite(SOIL_POWER_PIN, HIGH);//turn D7 "On"
     Serial.println("Moisture On");
     //delay(5000);
@@ -90,9 +90,9 @@ int readSoil(){
     int val = analogRead(SOIL_DATA_PIN);//Read the SIG value form sensor 
     digitalWrite(SOIL_POWER_PIN, LOW);//turn D7 "Off"
     delay(10);
-    digitalWrite(VOLTAGE_POWER_PIN, HIGH);    
+    digitalWrite(VOLTAGE_POWER_PIN, HIGH);   
+    delay(100); 
     Serial.println("Moisture Off");
-    //delay(5000);
     
     return val;//send current moisture value
 }
@@ -109,7 +109,7 @@ void loop() {
     
 
     digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(100);    
+    delay(200);    
     float temperature = sensor.getCelsiusHundredths()/100.0f;
     int humidity = sensor.getHumidityPercent();
     Serial.print("Temperature: ");
@@ -173,6 +173,7 @@ void loop() {
     Serial.print(lux);
     Serial.println(" lx");
 
+    digitalWrite(VOLTAGE_POWER_PIN, LOW);
 
     // delay(5000);
     // Serial.println("---------------------");
