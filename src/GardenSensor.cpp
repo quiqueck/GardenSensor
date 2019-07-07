@@ -43,6 +43,7 @@ void setup() {
     // begin returns a boolean that can be used to detect setup problems.
     if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE)) {
         Serial.println(F("BH1750 Advanced begin"));
+        lightMeter.setMTreg(138);
     } else {
         Serial.println(F("Error initialising BH1750"));
     }
@@ -168,12 +169,48 @@ void loop() {
     Serial.println("%");
     delay(500);
 
-    float lux = lightMeter.readLightLevel(true);
+float lux;
+//for (;;)
+{
+    lux = lightMeter.readLightLevel();
+    delay(50);
+    
+    if (lux > 40000.0) {
+      if (lightMeter.setMTreg(32)) {        
+        lux = lightMeter.readLightLevel();
+        Serial.println(F("Setting MTReg to low value for high light environment"));
+      } else {
+        Serial.println(F("Error setting MTReg to low value for high light environment"));
+      }
+    } else {
+        if (lux > 10.0) {
+          // typical light environment
+          if (lightMeter.setMTreg(69)) {
+            lux = lightMeter.readLightLevel(); 
+            Serial.println(F("Setting MTReg to default value for normal light environment"));
+          } else {
+            Serial.println(F("Error setting MTReg to default value for normal light environment"));
+          }
+        } else {
+          if (lux <= 10.0) {
+            //very low light environment
+            if (lightMeter.setMTreg(138)) {
+              lux = lightMeter.readLightLevel();
+              Serial.println(F("Setting MTReg to high value for low light environment"));
+            } else {
+              Serial.println(F("Error setting MTReg to high value for low light environment"));
+            }
+          }
+       }
+    }
+
     Serial.print("Light: ");
     Serial.print(lux);
     Serial.println(" lx");
+    delay(1000);
+}
 
-    digitalWrite(VOLTAGE_POWER_PIN, LOW);
+    
 
     // delay(5000);
     // Serial.println("---------------------");
@@ -189,7 +226,7 @@ void loop() {
 
         Serial.print("Connecting");
         bool failed = false;
-        int tries = 20;
+        int tries = 30;
         while (WiFi.status() != WL_CONNECTED)
         {
             delay(500);
@@ -256,11 +293,12 @@ void loop() {
         }
 
         WiFi.disconnect(true);
-        Serial.print("Disconnected");
+        Serial.println("Disconnected");
         retry--;
     }
 
     SPIFFS.end();
+    digitalWrite(VOLTAGE_POWER_PIN, LOW);
     //ESP.deepSleep(1e6); //1s
     ESP.deepSleep(15 * 60e6); //15min
 }
