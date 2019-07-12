@@ -50,7 +50,10 @@ app.get(prefix+'/001/data/json', function (req, res, next) {
         })
         .fromFile(path.join(__dirname, 'data.csv'))
         .then((jsonObj)=>{
-            payload.data = jsonObj;
+            payload.data = jsonObj.map((i, ct) => {
+                i["id"] = ct;
+                return i;
+            });
             res.json(payload);
             next();
         });

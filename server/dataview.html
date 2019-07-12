@@ -97,112 +97,174 @@
     </body>
 
     <script type="text/javascript">
+        function formatDate(d, last){
+            let date = '';
+            if (moment().subtract(1, 'hours').isBefore(d)){
+                date = "&nbsp;&nbsp;&nbsp;&nbsp;" + moment(d).locale("de").fromNow();
+            }  else if (moment(d).isSame(last, 'day')){
+                date = "&nbsp;&nbsp;&nbsp;&nbsp;" + moment(d).locale("de").format('LTS');
+            } else {
+                date = moment(d).locale("de").calendar();
+            }
+
+            return date;
+        }
+
+        let dataset = [];
+
+        function updateDates(){
+            let last = 0;
+            $.each(dataset, (idx, row) => {
+                let date = formatDate(row.date, last);                    
+                last = row.date;
+                $(`#date${row.id}`).html(date);
+            });
+            setTimeout(updateDates, 1000 * 10);
+        }
+
+        function reloadData(skip){
+            
+            if (skip===undefined || !skip) {
+                $.get( "/api/001/data/json")
+                .done(function(d) {
+                    console.log( "Received", d );
+                    let table = $('#mainTable tbody');
+                    let last = 0;
+                    let found = false;
+                    dataset = d.data;
+                    $.each(d.data, (idx, row) => {  
+                        let tableRow = $(`#r${row.id}`);                        
+                        if (tableRow === undefined || tableRow===null || tableRow.length==0){
+                            table.prepend(createTableRow(row, last));
+                            last = row.date;
+                            found = true;
+                        }                                                        
+                        
+                    });
+                    if (found){
+                        let old = $('svg');
+                        draw(d);
+                        old.remove();
+                    }
+                });
+            }
+            setTimeout(reloadData, 1000 * 50);
+        }
+
+        function draw(d){
+            let table = $('#mainTable tbody');
+            const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage'];
+
+            // set the dimensions and margins of the graph
+            const margin = {top: 20, right: 40, bottom: 30, left: 50},
+                width = table.innerWidth() - margin.left - margin.right,
+                height = 500 - margin.top - margin.bottom;
+
+            // set the ranges
+            let x = d3.scaleTime().range([0, width]);
+            let y = [];
+            let valueline = [];
+            for (let i=0; i<5; i++){
+                y[i] = d3.scaleLinear().range([height, 0]);
+
+                // define the 1st line
+                valueline[i] = d3.line()
+                    .x((d) => x(d.date))
+                    .y((d) => y[i](d[columns[i]]));
+            }
+
+            // append the svg obgect to the body of the page
+            // appends a 'group' element to 'svg'
+            // moves the 'group' element to the top left margin
+            var svg = d3.select("body").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                    .attr(  "transform",
+                            "translate(" + margin.left + "," + margin.top + ")");
+
+            const data = d.data.slice(Math.max(d.data.length - (72*6), 0));
+            // format the data
+            d.data.forEach((d) => {
+                    d.date = new Date(d.date);
+            });
+
+            x.domain(d3.extent(data, d => d.date));
+            for (let i=0; i<5; i++){
+                y[i].domain([0, d3.max(data, d => Math.max(d[columns[i]]))]);
+
+                    // Add the valueline path.
+                svg.append("path")
+                    .data([data])
+                    .attr("class", "line line"+i)
+                    .attr("d", valueline[i])                        
+            }
+
+            // Add the X Axis
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x));
+
+            // Add the Y0 Axis
+            svg.append("g")
+                .attr("class", "axisSteelBlue")
+                .call(d3.axisLeft(y[3]));
+
+            // Add the Y1 Axis
+            svg.append("g")
+                .attr("class", "axisRed")
+                .attr("transform", "translate( " + width + ", 0 )")
+                .call(d3.axisRight(y[4]));
+        }
+
+        function createTableRow(row, last){
+            let date = formatDate(row.date, last);                    
+                    
+            let str = `<tr id="r${row.id}"><td id="date${row.id}">${date}</td>`;
+            if (row.temperature!==null && row.temperature!=="undefined") str += `<td>${Math.round(row.temperature*10)/10}&thinsp;°C</td>`;
+            else str += '<td></td>';
+            
+            if (row.humidity!==null && row.humidity!=="undefined") str += `<td>${row.humidity}&thinsp;%</td>`;
+            else str += '<td></td>';
+
+            if (row.brightness!==null && row.brightness!=="undefined") str += `<td>${Math.ceil(row.brightness)}&thinsp;lux</td>`;
+            else str += '<td></td>';
+
+            if (row.moisture!==null && row.moisture!=="undefined") {
+                if (row.moisture_cached) {
+                    str += '<td style="color:silver">';
+                } else {
+                    str += '<td>';
+                }
+                str += `${row.moisture}&thinsp;</td>`;
+            } else str += '<td></td>';
+
+            if (row.voltage!==null && row.voltage!=="undefined") str += `<td>${row.voltage}&thinsp;</td>`;
+            else str += '<td></td>';
+
+            str += '</tr>';
+
+            return str;
+        }
+
         moment().locale('de');
         $.get( "/api/001/data/json")
             .done(function(d) {
                 console.log( "Received", d );
+
                 let nr = 0;
                 let table = $('#mainTable tbody');
                 let last = 0;
-                $.each(d.data, (idx, row) => {
-                    let date;
-                    if (moment().subtract(1, 'hours').isBefore(row.date)){
-                        date = "&nbsp;&nbsp;&nbsp;&nbsp;" + moment(row.date).locale("de").fromNow();
-                    }  else if (moment(row.date).isSame(last, 'day')){
-                        date = "&nbsp;&nbsp;&nbsp;&nbsp;" + moment(row.date).locale("de").format('LTS');
-                    } else {
-                        date = moment(row.date).locale("de").calendar();
-                    }
+                dataset = d.data;
+                $.each(d.data, (idx, row) => {                    
+                    table.prepend(createTableRow(row, last));
                     last = row.date;
-                    let str = `<tr><td>${date}</td>`;
-                        if (row.temperature!==null && row.temperature!=="undefined") str += `<td>${Math.round(row.temperature*10)/10}&thinsp;°C</td>`;
-                        else str += '<td></td>';
-                        
-                        if (row.humidity!==null && row.humidity!=="undefined") str += `<td>${row.humidity}&thinsp;%</td>`;
-                        else str += '<td></td>';
-
-                        if (row.brightness!==null && row.brightness!=="undefined") str += `<td>${Math.ceil(row.brightness)}&thinsp;lux</td>`;
-                        else str += '<td></td>';
-
-                        if (row.moisture!==null && row.moisture!=="undefined") {
-                            if (row.moisture_cached) {
-                                str += '<td style="color:silver">';
-                            } else {
-                                str += '<td>';
-                            }
-                            str += `${row.moisture}&thinsp;</td>`;
-                        } else str += '<td></td>';
-
-                        if (row.voltage!==null && row.voltage!=="undefined") str += `<td>${row.voltage}&thinsp;</td>`;
-                        else str += '<td></td>';
-
-                        str += '</tr>';
-                        table.prepend(str);
-                    
                 });
 
-                const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage'];
-
-                // set the dimensions and margins of the graph
-                const margin = {top: 20, right: 40, bottom: 30, left: 50},
-                    width = table.innerWidth() - margin.left - margin.right,
-                    height = 500 - margin.top - margin.bottom;
-
-                // set the ranges
-                let x = d3.scaleTime().range([0, width]);
-                let y = [];
-                let valueline = [];
-                for (let i=0; i<5; i++){
-                    y[i] = d3.scaleLinear().range([height, 0]);
-
-                    // define the 1st line
-                    valueline[i] = d3.line()
-                        .x((d) => x(d.date))
-                        .y((d) => y[i](d[columns[i]]));
-                }
-
-                // append the svg obgect to the body of the page
-                // appends a 'group' element to 'svg'
-                // moves the 'group' element to the top left margin
-                var svg = d3.select("body").append("svg")
-                    .attr("width", width + margin.left + margin.right)
-                    .attr("height", height + margin.top + margin.bottom)
-                    .append("g")
-                        .attr(  "transform",
-                                "translate(" + margin.left + "," + margin.top + ")");
-
-                const data = d.data.slice(Math.max(d.data.length - (48*4), 0));
-                // format the data
-                d.data.forEach((d) => {
-                        d.date = new Date(d.date);
-                });
-
-                x.domain(d3.extent(data, d => d.date));
-                for (let i=0; i<5; i++){
-                    y[i].domain([0, d3.max(data, d => Math.max(d[columns[i]]))]);
-
-                     // Add the valueline path.
-                    svg.append("path")
-                        .data([data])
-                        .attr("class", "line line"+i)
-                        .attr("d", valueline[i]);
-                }
-
-                // Add the X Axis
-                svg.append("g")
-                    .attr("transform", "translate(0," + height + ")")
-                    .call(d3.axisBottom(x));
-
-                // Add the Y0 Axis
-                svg.append("g")
-                    .attr("class", "axisSteelBlue")
-                    .call(d3.axisLeft(y[3]));
-
-                // Add the Y1 Axis
-                svg.append("g")
-                    .attr("class", "axisRed")
-                    .attr("transform", "translate( " + width + ", 0 )")
-                    .call(d3.axisRight(y[4]));
+                
+                draw(d);
+                updateDates();
+                reloadData(true);
             });
     </script>
 </html>
