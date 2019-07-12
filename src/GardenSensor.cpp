@@ -8,10 +8,18 @@
 #include <FS.h> 
 #include "WiFi.h"
 
+#define ANALOG_SAMPLES 10
 #define SOIL_POWER_PIN D3
 #define SENSOR_POWER_PIN D4
 #define VOLTAGE_POWER_PIN D5
 #define SOIL_DATA_PIN A0
+
+#define LUX_DEBUG 0
+
+//10 min
+#define SLEEP_DURATION 10 * 60e6
+#define SOIL_PAUSE_COUNT 1*6
+//#define SOIL_PAUSE_COUNT 0
 
 
 //uint8_t
@@ -43,7 +51,7 @@ void setup() {
     // begin returns a boolean that can be used to detect setup problems.
     if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE)) {
         Serial.println(F("BH1750 Advanced begin"));
-        lightMeter.setMTreg(138);
+        
     } else {
         Serial.println(F("Error initialising BH1750"));
     }
@@ -58,7 +66,7 @@ void setup() {
     
     
     digitalWrite(SENSOR_POWER_PIN, LOW);
-    digitalWrite(VOLTAGE_POWER_PIN, HIGH);
+    digitalWrite(VOLTAGE_POWER_PIN, LOW);
 
     if (!SPIFFS.begin()){
         Serial.println("SPIFFS Initialization Error");
@@ -81,17 +89,27 @@ void setup() {
     // Serial.println("==>***************");
 }
 
+int sampleAnalog(){
+    int value = 0;
+    for (int i=0; i<ANALOG_SAMPLES; i++) {
+      value += analogRead(SOIL_DATA_PIN);
+      delay(2);
+    }
+    return value/ANALOG_SAMPLES;
+}
+
 int readSoil(){
+    digitalWrite(SENSOR_POWER_PIN, LOW);
     digitalWrite(VOLTAGE_POWER_PIN, LOW);
     delay(100);
     digitalWrite(SOIL_POWER_PIN, HIGH);//turn D7 "On"
     Serial.println("Moisture On");
     //delay(5000);
     delay(100);//wait 10 milliseconds 
-    int val = analogRead(SOIL_DATA_PIN);//Read the SIG value form sensor 
+    int val = sampleAnalog();//Read the SIG value form sensor 
     digitalWrite(SOIL_POWER_PIN, LOW);//turn D7 "Off"
-    delay(10);
-    digitalWrite(VOLTAGE_POWER_PIN, HIGH);   
+    //delay(10);
+    //digitalWrite(VOLTAGE_POWER_PIN, HIGH);   
     delay(100); 
     Serial.println("Moisture Off");
     
@@ -101,42 +119,12 @@ int readSoil(){
 struct SoilInfo{    
     uint8_t counter;    
     uint16_t lastValue;
-    uint8_t reserved;
+    uint8_t lastMTreg;
 };
 
-void loop() {
-    delay(100);
-    Serial.println("Tick");
-    
-
-    digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(200);    
-    float temperature = sensor.getCelsiusHundredths()/100.0f;
-    int humidity = sensor.getHumidityPercent();
-    Serial.print("Temperature: ");
-    Serial.print(temperature);
-    Serial.println("°C");
-
-    Serial.print("Humidity: ");
-    Serial.print(humidity);
-    Serial.println("%");
-    digitalWrite(SENSOR_POWER_PIN, LOW);
-    delay(500);    
-
-    SoilInfo sInfo;
-    if (!SPIFFS.exists("/soil.dat")){
-        sInfo.counter = 0xff;
-        sInfo.lastValue = 0;        
-    } else {
-        File persistent = SPIFFS.open("/soil.dat", "r");
-        persistent.readBytes((char*)&sInfo, sizeof(sInfo));
-        Serial.printf("Read %d: ct=%d, val=%d\n", sizeof(sInfo), sInfo.counter, sInfo.lastValue);
-        persistent.close();
-    }
-     
+int readMoisture(SoilInfo& sInfo, bool& moistureCached, bool force=false){
     int moisture;
-    bool moistureCached;
-    if (sInfo.counter>=12){
+    if (force || sInfo.counter>=SOIL_PAUSE_COUNT){
         Serial.println("[measured]");
         sInfo.counter = 0;
         moisture = readSoil();
@@ -149,70 +137,159 @@ void loop() {
        moisture = sInfo.lastValue; 
     }
     
-    {
-        Serial.printf("Writing %d: ct=%d, val=%d\n", sizeof(sInfo), sInfo.counter, sInfo.lastValue);
-        File persistent = SPIFFS.open("/soil.dat", "w");
-        persistent.write((char*)&sInfo, sizeof(sInfo));
-        persistent.close();
-    }
-    
     Serial.print("Moisture: ");
     Serial.print(moisture);    
     Serial.println("");
 
-    int voltage = analogRead(SOIL_DATA_PIN);
-    float pvoltage = map(voltage, 177, 225, 0, 255)/255.0f;
+    return moisture;
+}
+
+void readVoltage(int& voltage, float& pvoltage){
+    digitalWrite(SENSOR_POWER_PIN, LOW);
+    digitalWrite(SOIL_POWER_PIN, LOW);
+    delay(100);
+    digitalWrite(VOLTAGE_POWER_PIN, HIGH);
+    delay(100);
+    voltage = sampleAnalog();
+    pvoltage = map(voltage, 13, 240, 0, 255)/255.0f;
     Serial.print("Voltage: ");
     Serial.print(voltage);
     Serial.print(" ");
     Serial.print(pvoltage*100);
     Serial.println("%");
-    delay(500);
-
-float lux;
-//for (;;)
-{
-    lux = lightMeter.readLightLevel();
-    delay(50);
-    
-    if (lux > 40000.0) {
-      if (lightMeter.setMTreg(32)) {        
-        lux = lightMeter.readLightLevel();
-        Serial.println(F("Setting MTReg to low value for high light environment"));
-      } else {
-        Serial.println(F("Error setting MTReg to low value for high light environment"));
-      }
-    } else {
-        if (lux > 10.0) {
-          // typical light environment
-          if (lightMeter.setMTreg(69)) {
-            lux = lightMeter.readLightLevel(); 
-            Serial.println(F("Setting MTReg to default value for normal light environment"));
-          } else {
-            Serial.println(F("Error setting MTReg to default value for normal light environment"));
-          }
-        } else {
-          if (lux <= 10.0) {
-            //very low light environment
-            if (lightMeter.setMTreg(138)) {
-              lux = lightMeter.readLightLevel();
-              Serial.println(F("Setting MTReg to high value for low light environment"));
-            } else {
-              Serial.println(F("Error setting MTReg to high value for low light environment"));
-            }
-          }
-       }
-    }
-
-    Serial.print("Light: ");
-    Serial.print(lux);
-    Serial.println(" lx");
-    delay(1000);
+    digitalWrite(VOLTAGE_POWER_PIN, LOW);
+    delay(100);
 }
 
-    
+void readEnv(float& temperature, int& humidity){
+    digitalWrite(SENSOR_POWER_PIN, HIGH);
+    delay(100);    
+    temperature = sensor.getCelsiusHundredths()/100.0f;
+    humidity = sensor.getHumidityPercent();
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.println("°C");
 
-    // delay(5000);
+    Serial.print("Humidity: ");
+    Serial.print(humidity);
+    Serial.println("%");
+    digitalWrite(SENSOR_POWER_PIN, LOW);
+    delay(100);
+}
+
+float readBrightness(SoilInfo& sInfo){
+    float lux;
+#if LUX_DEBUG == 1
+    for (;;)
+#endif
+    {        
+        delay(100);
+        lux = lightMeter.readLightLevel();
+        delay(50);
+        
+        if (lux > 40000.0) {
+            sInfo.lastMTreg = 32;
+            if (lightMeter.setMTreg(32)) {   
+                delay(50);     
+                lux = lightMeter.readLightLevel();
+                #if LUX_DEBUG == 1        
+                Serial.println(F("Setting MTReg to low value for high light environment"));
+                #endif
+            } else {
+                #if LUX_DEBUG == 1
+                Serial.println(F("Error setting MTReg to low value for high light environment"));
+                #endif
+            }
+        } else {
+            if (lux > 10.0) {
+                sInfo.lastMTreg = 69;
+                // typical light environment
+                if (lightMeter.setMTreg(69)) {
+                    delay(50);     
+                    lux = lightMeter.readLightLevel(); 
+                    #if LUX_DEBUG == 1
+                    Serial.println(F("Setting MTReg to default value for normal light environment"));
+                    #endif
+                } else {
+                    #if LUX_DEBUG == 1
+                    Serial.println(F("Error setting MTReg to default value for normal light environment"));
+                    #endif
+                }
+            } else {
+            if (lux <= 10.0) {
+                sInfo.lastMTreg = 138;
+                //very low light environment
+                if (lightMeter.setMTreg(138)) {
+                    delay(50);
+                    lux = lightMeter.readLightLevel();
+                    
+                    #if LUX_DEBUG == 1
+                    Serial.println(F("Setting MTReg to high value for low light environment"));
+                    #endif
+                } else {
+                    #if LUX_DEBUG == 1
+                    Serial.println(F("Error setting MTReg to high value for low light environment"));
+                    #endif
+                }
+            }
+        }
+        }
+
+        Serial.print("Light: ");
+        Serial.print(lux);
+        Serial.println(" lx");
+        delay(10);
+    }
+    return lux;
+}
+
+void readSoilInfo(SoilInfo& sInfo){
+    if (!SPIFFS.exists("/soil.dat")){
+        sInfo.counter = 0xff;
+        sInfo.lastValue = 0;  
+        sInfo.lastMTreg = 138;      
+    } else {
+        File persistent = SPIFFS.open("/soil.dat", "r");
+        persistent.readBytes((char*)&sInfo, sizeof(sInfo));
+        Serial.printf("Read %d: ct=%d, val=%d, mt=%d\n", sizeof(sInfo), sInfo.counter, sInfo.lastValue, sInfo.lastMTreg);
+        persistent.close();
+    } 
+
+    lightMeter.setMTreg(sInfo.lastMTreg);
+}
+
+void writeSoilInfo(SoilInfo& sInfo){
+    Serial.printf("Writing %d: ct=%d, val=%d, mt=%d\n", sizeof(sInfo), sInfo.counter, sInfo.lastValue, sInfo.lastMTreg);
+    File persistent = SPIFFS.open("/soil.dat", "w");
+    persistent.write((char*)&sInfo, sizeof(sInfo));
+    persistent.close();
+}
+
+void loop() {
+    Serial.println("Start Reading Data");  
+    SoilInfo sInfo;
+    readSoilInfo(sInfo);   
+
+    //Temperature & Humidity 
+    float temperature;
+    int humidity;
+    readEnv(temperature, humidity);  
+
+    //Soil Moisture
+    bool moistureCached = false;
+    int moisture = readMoisture(sInfo, moistureCached, false);
+
+    //Supply Voltage
+    int voltage;
+    float pvoltage;
+    readVoltage(voltage, pvoltage);    
+
+    //Ambient Brightness
+    float lux = readBrightness(sInfo);
+
+    writeSoilInfo(sInfo);
+
+    // delay(1000);
     // Serial.println("---------------------");
     // return;
 
@@ -256,7 +333,10 @@ float lux;
                 Serial.println(payload);                     //Print the response payload   
                 deserializeJson(doc, payload);  
 
-
+                if (doc["force"]["moisture"]) {
+                    moisture = readMoisture(sInfo, moistureCached, true);
+                    writeSoilInfo(sInfo);
+                }
 
                 doc["data"]["temperature"] = temperature;   
                 doc["data"]["humidity"] = humidity;   
@@ -274,6 +354,8 @@ float lux;
 
 
             if (!failed) {
+                didSend = true; //does this fix the issue of multiple sends at night???
+
                 http.begin(client, host, 7056, "/api/001/data", false);  //Specify request destination
                 Serial.println("Returning:");
                 Serial.println(payload);
@@ -300,5 +382,6 @@ float lux;
     SPIFFS.end();
     digitalWrite(VOLTAGE_POWER_PIN, LOW);
     //ESP.deepSleep(1e6); //1s
-    ESP.deepSleep(15 * 60e6); //15min
+    Serial.printf("Going to Sleep %f\n", SLEEP_DURATION);
+    ESP.deepSleep(SLEEP_DURATION); 
 }
