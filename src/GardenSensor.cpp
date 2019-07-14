@@ -9,18 +9,27 @@
 #include "WiFi.h"
 
 #define ANALOG_SAMPLES 10
+#define LUX_SAMPLES 3
 #define SOIL_POWER_PIN D3
 #define SENSOR_POWER_PIN D4
 #define VOLTAGE_POWER_PIN D5
 #define SOIL_DATA_PIN A0
 
-#define LUX_DEBUG 1
-#define TEST_MODE 1
-#define SEND_RESULTS 0
+#define LUX_DEBUG 0
+#define MULTIPLEX_DEBUG 0
+#define TEST_MODE 0
+#define SEND_RESULTS_TEST 1
 
 //10 min
 #define SLEEP_DURATION 10 * 60e6
+#if TEST_MODE == 0
+#define SEND_RESULTS 1
 #define SOIL_PAUSE_COUNT 1*6
+#else
+#define SEND_RESULTS SEND_RESULTS_TEST
+#define SOIL_PAUSE_COUNT 0
+#define LOOP_PAUSE 1000 * 60
+#endif
 //#define SOIL_PAUSE_COUNT 0
 
 
@@ -33,9 +42,49 @@
 BH1750 lightMeter(0x23);
 SI7021 sensor;
 StaticJsonDocument<2048> doc;
+
+#define MUX_OFF -1
+void multiplex(int pin=MUX_OFF){
+    #if MULTIPLEX_DEBUG==1
+    Serial.printf("Multiplexing Pin %d\n", pin);
+    #endif
+
+    if (pin != SENSOR_POWER_PIN){
+        #if MULTIPLEX_DEBUG==1
+        Serial.println("Env OFF");
+        #endif
+        digitalWrite(SENSOR_POWER_PIN, LOW);
+    }
+    if (pin != VOLTAGE_POWER_PIN) {
+        #if MULTIPLEX_DEBUG==1
+        Serial.println("Voltage OFF");
+        #endif
+        digitalWrite(VOLTAGE_POWER_PIN, LOW);
+    }
+    if (pin != SOIL_POWER_PIN) {
+        #if MULTIPLEX_DEBUG==1
+        Serial.println("Soil OFF");
+        #endif
+        digitalWrite(SOIL_POWER_PIN, LOW);
+    }
+
+    delay(10);
+
+    if (pin != MUX_OFF) {
+        #if MULTIPLEX_DEBUG==1
+        Serial.printf("Pin %d ON\n", pin);
+        #endif
+        
+        digitalWrite(pin, HIGH);
+        delay(100);
+    }
+}
+
 void setup() {
     Serial.begin(115200);
+    #if TEST_MODE == 1
     delay(100);
+    #endif
     // Wait for serial to initialize.
     //while(!Serial) { }
     Serial.println("Staring up...");
@@ -45,6 +94,7 @@ void setup() {
     pinMode(VOLTAGE_POWER_PIN, OUTPUT);
     
     digitalWrite(SOIL_POWER_PIN, LOW);
+    digitalWrite(VOLTAGE_POWER_PIN, LOW);
     digitalWrite(SENSOR_POWER_PIN, HIGH);
 
     Wire.begin();
@@ -67,8 +117,7 @@ void setup() {
     //analogSetAttenuation(ADC_6db);
     
     
-    digitalWrite(SENSOR_POWER_PIN, LOW);
-    digitalWrite(VOLTAGE_POWER_PIN, LOW);
+    multiplex();
 
     if (!SPIFFS.begin()){
         Serial.println("SPIFFS Initialization Error");
@@ -91,6 +140,8 @@ void setup() {
     // Serial.println("==>***************");
 }
 
+
+
 int sampleAnalog(){
     int value = 0;
     for (int i=0; i<ANALOG_SAMPLES; i++) {
@@ -101,18 +152,12 @@ int sampleAnalog(){
 }
 
 int readSoil(){
-    digitalWrite(SENSOR_POWER_PIN, LOW);
-    digitalWrite(VOLTAGE_POWER_PIN, LOW);
-    delay(100);
-    digitalWrite(SOIL_POWER_PIN, HIGH);//turn D7 "On"
+    multiplex(SOIL_POWER_PIN);   
     Serial.println("Moisture On");
-    //delay(5000);
-    delay(100);//wait 10 milliseconds 
+
     int val = sampleAnalog();//Read the SIG value form sensor 
-    digitalWrite(SOIL_POWER_PIN, LOW);//turn D7 "Off"
-    //delay(10);
-    //digitalWrite(VOLTAGE_POWER_PIN, HIGH);   
-    delay(100); 
+    
+    multiplex();    
     Serial.println("Moisture Off");
     
     return val;//send current moisture value
@@ -147,11 +192,9 @@ int readMoisture(SoilInfo& sInfo, bool& moistureCached, bool force=false){
 }
 
 void readVoltage(int& voltage, float& pvoltage){
-    digitalWrite(SENSOR_POWER_PIN, LOW);
-    digitalWrite(SOIL_POWER_PIN, LOW);
-    delay(100);
-    digitalWrite(VOLTAGE_POWER_PIN, HIGH);
-    delay(100);
+    multiplex(VOLTAGE_POWER_PIN); 
+    Serial.println("Voltage On");
+
     voltage = sampleAnalog();
     pvoltage = map(voltage, 13, 240, 0, 255)/255.0f;
     Serial.print("Voltage: ");
@@ -159,13 +202,15 @@ void readVoltage(int& voltage, float& pvoltage){
     Serial.print(" ");
     Serial.print(pvoltage*100);
     Serial.println("%");
-    digitalWrite(VOLTAGE_POWER_PIN, LOW);
-    delay(100);
+    
+    multiplex();    
+    Serial.println("Voltage Off");
 }
 
 void readEnv(float& temperature, int& humidity){
-    digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(100);    
+    multiplex(SENSOR_POWER_PIN); 
+    Serial.println("Sensor On");
+
     temperature = sensor.getCelsiusHundredths()/100.0f;
     humidity = sensor.getHumidityPercent();
     Serial.print("Temperature: ");
@@ -175,66 +220,81 @@ void readEnv(float& temperature, int& humidity){
     Serial.print("Humidity: ");
     Serial.print(humidity);
     Serial.println("%");
-    digitalWrite(SENSOR_POWER_PIN, LOW);
-    delay(100);
+    
+    multiplex();    
+    Serial.println("Env Off");
+}
+
+float readLux(){
+    float lux = 0;
+    for (int i=0; i<LUX_SAMPLES; i++) {
+        lux += lightMeter.readLightLevel();
+        delay(10);
+    }
+    return lux / LUX_SAMPLES;
 }
 
 float readBrightness(SoilInfo& sInfo){
     float lux;
 #if LUX_DEBUG == 1
-    for (;;)
+    //for (;;)
 #endif
-    {        
-        delay(100);
-        lux = lightMeter.readLightLevel();
-        delay(50);
+    {       
+        delay(10);
+        lux = readLux();         
         
-        if (lux > 40000.0) {
-            sInfo.lastMTreg = 32;
-            if (lightMeter.setMTreg(32)) {   
-                delay(50);     
-                lux = lightMeter.readLightLevel();
-                #if LUX_DEBUG == 1        
-                Serial.println(F("Setting MTReg to low value for high light environment"));
-                #endif
-            } else {
-                #if LUX_DEBUG == 1
-                Serial.println(F("Error setting MTReg to low value for high light environment"));
-                #endif
+        if (lux > 40000.0 ) {
+            if (sInfo.lastMTreg != 32){
+                sInfo.lastMTreg = 32;
+                if (lightMeter.setMTreg(32)) {   
+                    delay(50);     
+                    lux = readLux();  
+                    #if LUX_DEBUG == 1        
+                    Serial.println(F("Setting MTReg to low value for high light environment"));
+                    #endif
+                } else {
+                    #if LUX_DEBUG == 1
+                    Serial.println(F("Error setting MTReg to low value for high light environment"));
+                    #endif
+                }
             }
         } else {
             if (lux > 10.0) {
-                sInfo.lastMTreg = 69;
-                // typical light environment
-                if (lightMeter.setMTreg(69)) {
-                    delay(50);     
-                    lux = lightMeter.readLightLevel(); 
-                    #if LUX_DEBUG == 1
-                    Serial.println(F("Setting MTReg to default value for normal light environment"));
-                    #endif
-                } else {
-                    #if LUX_DEBUG == 1
-                    Serial.println(F("Error setting MTReg to default value for normal light environment"));
-                    #endif
+                if (sInfo.lastMTreg != 69){
+                    sInfo.lastMTreg = 69;
+                    // typical light environment
+                    if (lightMeter.setMTreg(69)) {
+                        delay(50);     
+                        lux = readLux();   
+                        #if LUX_DEBUG == 1
+                        Serial.println(F("Setting MTReg to default value for normal light environment"));
+                        #endif
+                    } else {
+                        #if LUX_DEBUG == 1
+                        Serial.println(F("Error setting MTReg to default value for normal light environment"));
+                        #endif
+                    }
                 }
             } else {
-            if (lux <= 10.0) {
-                sInfo.lastMTreg = 138;
-                //very low light environment
-                if (lightMeter.setMTreg(138)) {
-                    delay(50);
-                    lux = lightMeter.readLightLevel();
-                    
-                    #if LUX_DEBUG == 1
-                    Serial.println(F("Setting MTReg to high value for low light environment"));
-                    #endif
-                } else {
-                    #if LUX_DEBUG == 1
-                    Serial.println(F("Error setting MTReg to high value for low light environment"));
-                    #endif
+                if (lux <= 10.0) {
+                    if (sInfo.lastMTreg != 138){
+                        sInfo.lastMTreg = 138;
+                        //very low light environment
+                        if (lightMeter.setMTreg(138)) {
+                            delay(50);     
+                            lux = readLux();  
+                            
+                            #if LUX_DEBUG == 1
+                            Serial.println(F("Setting MTReg to high value for low light environment"));
+                            #endif
+                        } else {
+                            #if LUX_DEBUG == 1
+                            Serial.println(F("Error setting MTReg to high value for low light environment"));
+                            #endif
+                        }
+                    }
                 }
             }
-        }
         }
 
         Serial.print("Light: ");
@@ -269,6 +329,7 @@ void writeSoilInfo(SoilInfo& sInfo){
 
 void loop() {
     Serial.println("Start Reading Data");  
+
     SoilInfo sInfo;
     readSoilInfo(sInfo);   
 
@@ -291,11 +352,7 @@ void loop() {
 
     writeSoilInfo(sInfo);
 
-#if TEST_MODE == 1
-    delay(1000);
-    Serial.println("---------------------");
-    return;
-#endif
+
 
 #if SEND_RESULTS == 1
     bool didSend = false;
@@ -345,7 +402,8 @@ void loop() {
                 doc["data"]["temperature"] = temperature;   
                 doc["data"]["humidity"] = humidity;   
                 doc["data"]["voltage"] = voltage;   
-                doc["data"]["brightness"] = lux;   
+                doc["data"]["brightness"]["value"] = lux;   
+                doc["data"]["brightness"]["mt"] = sInfo.lastMTreg;   
                 doc["data"]["moisture"]["value"] = moisture;   
                 doc["data"]["moisture"]["cached"] = moistureCached;   
 
@@ -387,6 +445,14 @@ void loop() {
     SPIFFS.end();
     digitalWrite(VOLTAGE_POWER_PIN, LOW);
     //ESP.deepSleep(1e6); //1s
+    
+
+#if TEST_MODE == 1
+    Serial.printf("Pausing %f\n", LOOP_PAUSE/1000.0f);
+    delay(LOOP_PAUSE);
+    Serial.println("---------------------");
+    return;
+#endif
     Serial.printf("Going to Sleep %f\n", SLEEP_DURATION);
     ESP.deepSleep(SLEEP_DURATION); 
 }

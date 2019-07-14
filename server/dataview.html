@@ -56,6 +56,10 @@
                 stroke:lightblue;
                 background-color:lightblue;
             }
+            .line5{
+                stroke:magenta;
+                background-color:magenta;
+            }
 
             .axisSteelBlue text{
                 fill: green;
@@ -84,6 +88,7 @@
                             <th><div class="box line0"></div> Temperature</th>
                             <th><div class="box line1"></div> Humidity</th>
                             <th><div class="box line2"></div> Brightness</th>
+                            <th><div class="box line5"></div> MT</th>
                             <th><div class="box line3"></div> Moisture</th>
                             <th><div class="box line4"></div> Voltage</th></tr>
                     </thead>
@@ -153,7 +158,7 @@
 
         function draw(d){
             let table = $('#mainTable tbody');
-            const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage'];
+            const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage', 'brightness_mt'];
 
             // set the dimensions and margins of the graph
             const margin = {top: 20, right: 40, bottom: 30, left: 50},
@@ -164,7 +169,7 @@
             let x = d3.scaleTime().range([0, width]);
             let y = [];
             let valueline = [];
-            for (let i=0; i<5; i++){
+            for (let i=0; i<columns.length; i++){
                 y[i] = d3.scaleLinear().range([height, 0]);
 
                 // define the 1st line
@@ -190,7 +195,7 @@
             });
 
             x.domain(d3.extent(data, d => d.date));
-            for (let i=0; i<5; i++){
+            for (let i=0; i<columns.length; i++){
                 y[i].domain([0, d3.max(data, d => Math.max(d[columns[i]]))]);
 
                     // Add the valueline path.
@@ -228,6 +233,9 @@
             else str += '<td></td>';
 
             if (row.brightness!==null && row.brightness!=="undefined") str += `<td>${Math.ceil(row.brightness)}&thinsp;lux</td>`;
+            else str += '<td></td>';
+
+            if (row.brightness_mt!==null && row.brightness_mt!=="undefined") str += `<td>${row.brightness_mt}</td>`;
             else str += '<td></td>';
 
             if (row.moisture!==null && row.moisture!=="undefined") {

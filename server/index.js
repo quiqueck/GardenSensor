@@ -31,7 +31,7 @@ app.get(prefix+'/001/data/json', function (req, res, next) {
         date : new Date(),       
     }
     csv({
-        headers:['date', 'temperature', 'humidity', 'voltage', 'brightness', 'moisture', 'moisture_cached']
+        headers:['date', 'temperature', 'humidity', 'voltage', 'brightness', 'moisture', 'moisture_cached', 'brightness_mt']
         , noheader:true
         , objectMode: true
         , nullObject: true
@@ -40,6 +40,7 @@ app.get(prefix+'/001/data/json', function (req, res, next) {
             , humidity:'number'
             , voltage:'number'
             , brightness:'number'
+            , brightness_mt:'number'
             , moisture:'number'
             , moisture_cached:function(item, head, resultRow, row , colIdx){
                 return (item=="true");
@@ -69,7 +70,10 @@ app.get(prefix+'/001/data', function (req, res, next) {
             temperature: null,
             humidity: null,
             voltage: null,
-            brightness: null,
+            brightness: {
+                value: null,
+                mt: null
+            },
             moisture: {
                 value: null,
                 cached: null
@@ -85,7 +89,7 @@ app.put(prefix+'/001/data', function (req, res, next) {
     console.log(payload); 
 
     if (payload && payload.data){
-        const line = `${payload.date},${payload.data.temperature},${payload.data.humidity},${payload.data.voltage},${payload.data.brightness},${payload.data.moisture.value},${payload.data.moisture.cached}\n`;
+        const line = `${payload.date},${payload.data.temperature},${payload.data.humidity},${payload.data.voltage},${payload.data.brightness.value},${payload.data.moisture.value},${payload.data.moisture.cached},${payload.data.brightness.mt}\n`;
         fs.appendFile(path.join(__dirname, 'data.csv'), line, function (err) {
             if (err) {
                 res.json({
