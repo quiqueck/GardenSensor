@@ -14,7 +14,9 @@
 #define VOLTAGE_POWER_PIN D5
 #define SOIL_DATA_PIN A0
 
-#define LUX_DEBUG 0
+#define LUX_DEBUG 1
+#define TEST_MODE 1
+#define SEND_RESULTS 0
 
 //10 min
 #define SLEEP_DURATION 10 * 60e6
@@ -289,11 +291,13 @@ void loop() {
 
     writeSoilInfo(sInfo);
 
-    // delay(1000);
-    // Serial.println("---------------------");
-    // return;
+#if TEST_MODE == 1
+    delay(1000);
+    Serial.println("---------------------");
+    return;
+#endif
 
-
+#if SEND_RESULTS == 1
     bool didSend = false;
     int retry = 5;
     while (!didSend && retry>0) {
@@ -378,6 +382,7 @@ void loop() {
         Serial.println("Disconnected");
         retry--;
     }
+#endif
 
     SPIFFS.end();
     digitalWrite(VOLTAGE_POWER_PIN, LOW);
