@@ -59,6 +59,7 @@
             .line5{
                 stroke:magenta;
                 background-color:magenta;
+                stroke-width: 1px;
             }
 
             .axisSteelBlue text{
@@ -175,7 +176,7 @@
                 // define the 1st line
                 valueline[i] = d3.line()
                     .x((d) => x(d.date))
-                    .y((d) => y[i](d[columns[i]]));
+                    .y((d) => y[i](d[columns[i]]?d[columns[i]]:0));
             }
 
             // append the svg obgect to the body of the page
