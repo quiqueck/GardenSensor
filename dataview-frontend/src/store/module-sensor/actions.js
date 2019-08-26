@@ -1,11 +1,14 @@
 import axios from "axios";
 import moment from "moment";
 
+const basePath = "http://localhost:7056/api/001";
+//const basePath = "/api/001";
+
 export const loadNewSensorData = ({ commit, state }) => {
   //console.log(commit, state.latestID);
   if (state.latestID > 0) {
     axios
-      .get("http://localhost:7056/api/001/data/json/afterID/" + state.latestID)
+      .get(basePath + "/data/json/afterID/" + state.latestID)
       .then(r => r.data)
       .then(sensorData => {
         console.log(sensorData);
@@ -18,7 +21,7 @@ export const loadNewSensorData = ({ commit, state }) => {
 
 export const loadInitialSensorData = ({ commit }) => {
   axios
-    .get("http://localhost:7056/api/001/data/json/latest/600")
+    .get(basePath + "/data/json/latest/600")
     .then(r => r.data)
     .then(sensorData => {
       commit("setSensorReadings", sensorData);
@@ -32,12 +35,7 @@ export const loadInitialSensorData = ({ commit }) => {
         .format();
 
       axios
-        .get(
-          "http://localhost:7056/api/001/data/json/after/" +
-            start +
-            "/before/" +
-            end
-        )
+        .get(basePath + "/data/json/after/" + start + "/before/" + end)
         .then(r => r.data)
         .then(sensorDataLastYear => {
           commit("addOlderSensorReadings", sensorDataLastYear);

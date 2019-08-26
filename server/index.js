@@ -4,7 +4,8 @@ const fs = require("fs"),
   bodyParser = require("body-parser"),
   app = express(),
   csv = require("csvtojson"),
-  packageJSON = require("./package.json");
+  packageJSON = require("./package.json"),
+  cors = require('cors');
 const port = 7056;
 const prefix = "/api";
 
@@ -14,23 +15,45 @@ app.use(bodyParser.urlencoded({ extended: false }));
 // parse application/json
 app.use(bodyParser.json());
 
-app.use(function (req, res, next) {
-    // Website you wish to allow to connect
-    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8080');
+var allowedOrigins = ['http://localhost:'+port,
+                      'http://127.0.0.1:'+port,
+                      'http://192.168.55.21:'+port];
+app.use(cors({
+  origin: function(origin, callback){
+    // allow requests with no origin 
+    // (like mobile apps or curl requests)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      var msg = 'The CORS policy for this site does not ' +
+                'allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
 
-    // Request methods you wish to allow
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+// app.use(function (req, res, next) {
+//     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+//     const host = req.headers.host;
+//     console.log(ip, host, 'http://' + host);
+//     // Website you wish to allow to connect
+//     res.setHeader('Access-Control-Allow-Origin', 'http://' + host);
 
-    // Request headers you wish to allow
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+//     // Request methods you wish to allow
+//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
 
-    // Set to true if you need the website to include cookies in the requests sent
-    // to the API (e.g. in case you use sessions)
-    res.setHeader('Access-Control-Allow-Credentials', true);
+//     // Request headers you wish to allow
+//     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
 
-    // Pass to next layer of middleware
-    next();
-});
+//     // Set to true if you need the website to include cookies in the requests sent
+//     // to the API (e.g. in case you use sessions)
+//     res.setHeader('Access-Control-Allow-Credentials', true);
+
+//     // Pass to next layer of middleware
+//     next();
+// });
+
+app.use('/', express.static(path.join(__dirname, "dist")));
 
 app.get(prefix + "/001/time", function(req, res, next) {
   const payload = {
@@ -272,7 +295,7 @@ app.get("/css/bootstrap.min.css.map", (request, response) => {
 app.get("/css/bootstrap.min.css.map", (request, response) => {
   response.sendFile(path.join(__dirname, "../css/bootstrap.min.css.map"));
 });
-app.get("/", (request, response) => {
+app.get("/old", (request, response) => {
   response.send(buildIndexHTML());
 });
 
