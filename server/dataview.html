@@ -61,6 +61,11 @@
                 background-color:magenta;
                 stroke-width: 1px;
             }
+            .line6{
+                stroke:blueviolet;
+                background-color:blueviolet;
+                stroke-width: 4px;
+            }
 
             .axisSteelBlue text{
                 fill: green;
@@ -159,7 +164,7 @@
 
         function draw(d){
             let table = $('#mainTable tbody');
-            const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage', 'brightness_mt'];
+            const columns = ['temperature', 'humidity', 'brightness', 'moisture', 'voltage', 'brightness_mt', 'soil'];
 
             // set the dimensions and margins of the graph
             const margin = {top: 20, right: 40, bottom: 30, left: 50},
@@ -240,12 +245,17 @@
             else str += '<td></td>';
 
             if (row.moisture!==null && row.moisture!=="undefined") {
+                if (row.voltage!==null && row.voltage!=="undefined"){
+                    row.soil = Math.round((row.moisture/row.voltage)*100)/100;
+                } else {
+                    row.soil = -1;
+                }
                 if (row.moisture_cached) {
                     str += '<td style="color:silver">';
                 } else {
                     str += '<td>';
                 }
-                str += `${row.moisture}&thinsp;</td>`;
+                str += `${row.moisture}&thinsp;(${row.soil})</td>`;
             } else str += '<td></td>';
 
             if (row.voltage!==null && row.voltage!=="undefined") str += `<td>${row.voltage}&thinsp;</td>`;

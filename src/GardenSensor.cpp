@@ -10,7 +10,7 @@
 
 #define ANALOG_SAMPLES 10
 #define LUX_SAMPLES 3
-#define SOIL_POWER_PIN D3
+#define SOIL_POWER_PIN D6
 #define SENSOR_POWER_PIN D4
 #define VOLTAGE_POWER_PIN D5
 #define SOIL_DATA_PIN A0
@@ -18,17 +18,17 @@
 #define LUX_DEBUG 0
 #define MULTIPLEX_DEBUG 0
 #define TEST_MODE 0
-#define SEND_RESULTS_TEST 1
+#define SEND_RESULTS_TEST 0
 
 //10 min
 #define SLEEP_DURATION 10 * 60e6
 #if TEST_MODE == 0
 #define SEND_RESULTS 1
-#define SOIL_PAUSE_COUNT 1*6
+#define SOIL_PAUSE_COUNT 1
 #else
 #define SEND_RESULTS SEND_RESULTS_TEST
-#define SOIL_PAUSE_COUNT 0
-#define LOOP_PAUSE 1000 * 60
+#define SOIL_PAUSE_COUNT 1
+#define LOOP_PAUSE 1000 * 2
 #endif
 //#define SOIL_PAUSE_COUNT 0
 
@@ -259,7 +259,7 @@ float readBrightness(SoilInfo& sInfo){
                 }
             }
         } else {
-            if (lux > 10.0) {
+            if (lux > 10.0 || lux < 0) {
                 if (sInfo.lastMTreg != 69){
                     sInfo.lastMTreg = 69;
                     // typical light environment
@@ -447,7 +447,7 @@ void loop() {
     //ESP.deepSleep(1e6); //1s
     
 
-#if TEST_MODE == 1
+#if TEST_MODE == 1    
     Serial.printf("Pausing %f\n", LOOP_PAUSE/1000.0f);
     delay(LOOP_PAUSE);
     Serial.println("---------------------");
@@ -455,4 +455,5 @@ void loop() {
 #endif
     Serial.printf("Going to Sleep %f\n", SLEEP_DURATION);
     ESP.deepSleep(SLEEP_DURATION); 
+    delay(SLEEP_DURATION/1000);
 }
