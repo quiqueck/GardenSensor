@@ -32,7 +32,12 @@ module.exports = {
   // add your custom rules here
   rules: {
     'prefer-promise-reject-errors': 'off',
+    //'brace-style': [2, 'stroustrup', { 'allowSingleLine': true }],
 
+    'vue/max-attributes-per-line': 0,
+    'vue/valid-v-for': 0,
+    'no-tabs': ["error", { allowIndentationTabs: false }],
+    'indent': ["error", 4],
     // allow console.log during development only
     'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
     // allow debugger during development only

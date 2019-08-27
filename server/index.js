@@ -16,6 +16,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 var allowedOrigins = ['http://localhost:'+port,
+                      'http://localhost:8080',
                       'http://127.0.0.1:'+port,
                       'http://192.168.55.21:'+port];
 app.use(cors({
