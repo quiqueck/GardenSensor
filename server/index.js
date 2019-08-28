@@ -55,6 +55,9 @@ app.use(cors({
 // });
 
 app.use('/', express.static(path.join(__dirname, "dist")));
+app.use('/graphs', express.static(path.join(__dirname, "dist")));
+app.use('/raw', express.static(path.join(__dirname, "dist")));
+
 
 app.get(prefix + "/001/time", function(req, res, next) {
   const payload = {
