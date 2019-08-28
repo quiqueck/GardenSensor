@@ -1,5 +1,5 @@
 <template>
-    <q-page>
+    <q-page class="flex justify-center">
         <q-table
             title="Rohdaten"
             dense
@@ -7,6 +7,7 @@
             :columns="columns"
             row-key="name"
             :pagination.sync="pagination"
+            class="tbl"
         >
             <q-td
                 :style="moistureStyle(props)"
@@ -20,7 +21,11 @@
     </q-page>
 </template>
 
-<style></style>
+<style scoped>
+.tbl{
+  height: fit-content;
+}
+</style>
 
 <script>
 import { mapState } from "vuex";
