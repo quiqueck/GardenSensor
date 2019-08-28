@@ -165,6 +165,7 @@ export default {
 <style scoped>
 .my-card {
     margin: 8px;
+    height: fit-content;
 }
 .light {
     color: rgb(198, 198, 198);

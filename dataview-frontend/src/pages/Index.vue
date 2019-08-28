@@ -1,5 +1,5 @@
 <template>
-    <q-page class="flex flex-center">
+    <q-page class="flex flex-top items-start content-start">
         <weather :info="latestSensorData"></weather>
         <weather :info="yesterdaySensorData"></weather>
         <weather :info="lastYearSensorData" v-if="hasLastYear"></weather>

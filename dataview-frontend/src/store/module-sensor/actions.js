@@ -1,9 +1,8 @@
 import axios from "axios";
 import moment from "moment";
 
-const basePath = "http://localhost:7056/api/001";
-//const basePath = "/api/001";
-
+const basePath = process.env.DEV ? "http://localhost:7056/api/001" : "/api/001";
+console.log(process.env.APP_VERSION);
 export const loadNewSensorData = ({ commit, state }) => {
     //console.log(commit, state.latestID);
     if (state.latestID > 0) {

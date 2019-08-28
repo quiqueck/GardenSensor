@@ -8,7 +8,7 @@
 export default {
     name: "App",
     data: function() {
-        return { interval: null };
+        return { interval: null, versionString: 2.0 };
     },
     mounted() {
         this.$store.dispatch("sensor/loadInitialSensorData").then(() => {

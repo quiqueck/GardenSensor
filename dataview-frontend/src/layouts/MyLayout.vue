@@ -32,7 +32,13 @@
 
                     <q-space />
                     <q-separator dark vertical inset></q-separator>
-                    <q-toolbar-title shrink>Garden View</q-toolbar-title>
+
+                    <q-toolbar-title shrink>
+                        Garden View
+                        <span class="text-caption">
+                            ({{ versionString }})
+                        </span>
+                    </q-toolbar-title>
                 </q-toolbar>
             </q-header>
 
@@ -50,7 +56,8 @@ export default {
     name: "MyLayout",
     data() {
         return {
-            tab: null
+            tab: null,
+            versionString: process.env.APP_VERSION
         };
     },
     methods: {
