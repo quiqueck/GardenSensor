@@ -1,8 +1,6 @@
 <template>
     <q-page class="flex flex-center">
-        <graph
-            :data="[temperatures, humidity, voltage, moisture, brightness]"
-        ></graph>
+        <graph :values="displayedData"></graph>
     </q-page>
 </template>
 
@@ -27,38 +25,97 @@ export default {
     },
     computed: {
         ...mapState("sensor", ["sensorData"]),
+        displayedData() {
+            return {
+                id: moment().format(moment.HTML5_FMT.DATETIME_LOCAL_SECONDS),
+                data: [
+                    this.temperatures,
+                    this.humidity,
+                    this.voltage,
+                    this.moisture,
+                    this.brightness
+                ]
+            };
+        },
+        values() {
+            return this.sensorData.data;
+        },
         temperatures() {
-            return this.createSet("Temperatur", "line-red", "temperature");
+            return this.createSet(
+                "Temperatur",
+                "line-red",
+                "°C",
+                "temperature"
+            );
         },
         humidity() {
-            return this.createSet("Luftfeuchtigkeit", "line-blue", "humidity");
+            return this.createSet(
+                "Luftfeuchtigkeit",
+                "line-blue",
+                "%",
+                "humidity"
+            );
         },
         voltage() {
-            return this.createMappedSet("Spannung", "line-lightblue", i =>
+            return this.createMappedSet("Spannung", "line-lightblue", "%", i =>
                 this.$store.getters["sensor/pVoltage"](i["voltage"])
             );
         },
         moisture() {
-            return this.createMappedSet("Bodenfeuchtigkeit", "line-green", i =>
-                this.$store.getters["sensor/pMoisture"](i["moisture"])
+            return this.createFilteredMappedSet(
+                "Bodenfeuchtigkeit",
+                "line-green",
+                "%",
+                (i, refTime) =>
+                    i.moisture_cached === false &&
+                    moment(i.date).isAfter(refTime),
+                i => this.$store.getters["sensor/pMoisture"](i["moisture"])
             );
         },
         brightness() {
-            return this.createSet("Helligkeit", "line-orange", "brightness");
+            return this.createSet(
+                "Helligkeit",
+                "line-orange",
+                "lx",
+                "brightness"
+            );
         }
     },
+    mounted() {
+        window.addEventListener("resize", this.onResize);
+        this.onResize();
+    },
     methods: {
-        createSet(label, clas, field) {
-            return this.createMappedSet(label, clas, i => i[field]);
+        onResize() {
+            if (this.$el.offsetWidth < 4 * (24 * 6)) {
+                this.range = 1;
+            } else if (this.$el.offsetWidth < 4 * (2 * 24 * 6)) {
+                this.range = 2;
+            } else {
+                this.range = 3;
+            }
         },
-        createMappedSet(label, clas, mapping) {
+        createSet(label, clas, unit, field) {
+            return this.createMappedSet(label, clas, unit, i => i[field]);
+        },
+        createMappedSet(label, clas, unit, mapping) {
+            return this.createFilteredMappedSet(
+                label,
+                clas,
+                unit,
+                (i, refTime) => moment(i.date).isAfter(refTime),
+                mapping
+            );
+        },
+        createFilteredMappedSet(label, clas, unit, filter, mapping) {
             const refTime = moment().subtract(this.range, this.rangeUnit);
             return {
                 label: label,
                 class: clas,
-                values: this.sensorData.data
+                unit: unit,
+                values: this.values
                     .filter(i => {
-                        return moment(i.date).isAfter(refTime);
+                        return filter(i, refTime);
                     })
                     .map(i => {
                         return {
@@ -70,14 +127,13 @@ export default {
         }
     },
     created() {
-        console.log("Creating", this.doForcedUpdates);
         this.interval = setInterval(() => {
             this.$forceUpdate();
         }, 10000);
     },
     beforeDestroy() {
-        console.log("Clearing");
         clearInterval(this.interval);
+        window.removeEventListener("resize", this.onResize);
     }
 };
 </script>

@@ -81,14 +81,13 @@ export default {
     },
     computed: {
         moistClass: function() {
-            if (this.info === undefined) return "text-gray q-ma-md";
+            if (this.info === undefined) return "text-grey-11 q-ma-md";
             return this.info.moisture_cached
-                ? "text-gray q-ma-md"
-                : "text-green q-ma-md";
+                ? "text-grey-13 q-ma-md"
+                : "text-" + this.moistureColor() + " q-ma-md";
         },
         moistColor: function() {
-            if (this.info === undefined) return "text-gray q-ma-md";
-            return this.info.moisture_cached ? "gray" : "green";
+            return this.moistureColor();
         },
         moisture: function() {
             if (this.info === undefined) return "0";
@@ -125,18 +124,39 @@ export default {
             return MomentDateFull(this.info.date);
         }
     },
-    methods: {},
+    methods: {
+        moistureColor() {
+            if (this.info === undefined) return "grey-11";
+            const colors = [
+                "red-7",
+                "deep-orange-7",
+                "orange-7",
+                "amber-7",
+                "yellow-7",
+                "lime-7",
+                "light-green-5",
+                "light-green-7",
+                "green-5",
+                "teal-6",
+                "teal-9"
+            ];
+
+            const val =
+                (Math.max(0, Math.min(100, this.moisture)) / 100) *
+                (colors.length - 1);
+
+            return colors[Math.floor(val)];
+        }
+    },
     components: {
         QCard
     },
     created() {
-        console.log("Creating", this.doForcedUpdates);
         this.interval = setInterval(() => {
             this.$forceUpdate();
         }, 10000);
     },
     beforeDestroy() {
-        console.log("Clearing");
         clearInterval(this.interval);
     }
 };
