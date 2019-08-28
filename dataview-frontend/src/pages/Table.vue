@@ -51,21 +51,21 @@ export default {
                 },
                 {
                     name: "humidity",
-                    label: "Luftfeuchtigkeit",
+                    label: "Luft",
                     field: "humidity",
                     sortable: true,
                     format: val => `${val}%`
                 },
                 {
                     name: "brightness",
-                    label: "Helligkeit",
+                    label: "Licht",
                     field: "brightness",
                     sortable: true,
                     format: val => `${val} lx`
                 },
                 {
                     name: "moisture",
-                    label: "Bodenfeuchtigkeit",
+                    label: "Boden",
                     field: "moisture",
                     sortable: true,
                     format: val =>
