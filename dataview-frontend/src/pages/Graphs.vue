@@ -41,30 +41,25 @@ export default {
             return this.sensorData.data;
         },
         temperatures() {
-            return this.createSet(
-                "Temperatur",
-                "line-red",
-                "°C",
-                "temperature"
-            );
+            return this.createSet("Temperatur", "red", "°C", "temperature");
         },
         humidity() {
             return this.createSet(
                 "Luftfeuchtigkeit",
-                "line-blue",
+                "indigo-5",
                 "%",
                 "humidity"
             );
         },
         voltage() {
-            return this.createMappedSet("Spannung", "line-lightblue", "%", i =>
+            return this.createMappedSet("Spannung", "blue-11", "%", i =>
                 this.$store.getters["sensor/pVoltage"](i["voltage"])
             );
         },
         moisture() {
             return this.createFilteredMappedSet(
                 "Bodenfeuchtigkeit",
-                "line-green",
+                "green",
                 "%",
                 (i, refTime) =>
                     i.moisture_cached === false &&
@@ -73,11 +68,14 @@ export default {
             );
         },
         brightness() {
+            return this.createSet("Helligkeit", "orange", "lx", "brightness");
+        },
+        brightnessMT() {
             return this.createSet(
-                "Helligkeit",
-                "line-orange",
-                "lx",
-                "brightness"
+                "Sensitivität Helligkeit",
+                "pink-14",
+                "",
+                "brightness_mt"
             );
         }
     },
