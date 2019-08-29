@@ -20,8 +20,8 @@
                     :d="path.line"
                 />
                 <path class="selector" :d="selector" />
+                <path class="hairline" :d="hairline" />
             </g>
-            <g ref="xAxis"></g>
         </svg>
 
         <div
@@ -62,6 +62,7 @@ export default {
             paths: [{ line: [], points: [], id: 0 }],
             scaled: { x: null, y: null },
             selector: null,
+            hairline: null,
             lastHoverPoint: {},
             lastMouse: { x: -1, y: -1, e: null },
             popover: {
@@ -164,6 +165,13 @@ export default {
             .x(d => d.x)
             .y0(d => d.max)
             .y1(0),
+        createValueHairline: function(points) {
+            return d3
+                .area()
+                .x0(0)
+                .x1(this.padded.width)
+                .y(d => d.y)(points);
+        },
         update() {
             //console.log("Updating", this.data.length);
             let updatedPaths = [];
@@ -216,6 +224,9 @@ export default {
 
             if (updatedPaths.length > 0) {
                 const mainPath = updatedPaths[0];
+                console.log("MainPath", mainPath);
+                const secondaryPath =
+                    updatedPaths.length > 1 ? updatedPaths[1] : undefined;
                 //console.log("In", this.$refs.svg);
                 let svg = d3.select(this.$refs.svg);
 
@@ -249,16 +260,33 @@ export default {
                     )
                     .attr("class", "axis " + mainPath.color)
                     .call(d3.axisLeft(mainPath.scaled.y));
+
+                if (secondaryPath) {
+                    // Add the Y0 Axis
+                    svg.append("g")
+
+                        .attr("id", "Axis")
+                        .attr(
+                            "style",
+                            "transform:translate(" +
+                                (this.margin.left + this.padded.width) +
+                                "px, " +
+                                this.margin.top +
+                                "px)"
+                        )
+                        .attr("class", "axis " + secondaryPath.color)
+                        .call(d3.axisRight(secondaryPath.scaled.y));
+                }
             }
         },
-        mousedown({ offsetX, pageY, screenX, screenY }) {
-            this.lastMouse.e = { offsetX, pageY, screenX, screenY };
+        mousedown({ offsetX, offsetY, pageY, screenX, screenY }) {
+            this.lastMouse.e = { offsetX, offsetY, pageY, screenX, screenY };
             this.popover.visible = true;
         },
         mouseup() {
             this.popover.visible = false;
         },
-        mouseover({ offsetX, pageY, screenX, screenY }) {
+        mouseover({ offsetX, offsetY, pageY, screenX, screenY }) {
             if (
                 Math.abs(screenX - this.lastMouse.x) < 2 &&
                 Math.abs(screenY - this.lastMouse.y) < 2
@@ -270,11 +298,15 @@ export default {
             this.paths.forEach((path, idx) => {
                 if (path.points.length > 0) {
                     const x = offsetX - this.margin.left;
+                    const y = offsetY - this.margin.top;
                     const closestPoint = this.getClosestPoint(x, idx);
                     const point = path.points[closestPoint.index];
 
                     if (idx == 0) {
                         this.selector = this.createValueSelector([point]);
+                        this.hairline = this.createValueHairline([
+                            { x: 0, y: y }
+                        ]);
                         this.$emit(
                             "select",
                             this.data[0].values[closestPoint.index]
@@ -300,7 +332,7 @@ export default {
 
             this.popover.lines = lines;
             this.popover.lastUpdateVisible = this.popover.visible;
-            this.lastMouse.e = { offsetX, pageY, screenX, screenY };
+            this.lastMouse.e = { offsetX, offsetY, pageY, screenX, screenY };
             if (!this.popover.visible || this.$refs.stats === undefined) return;
 
             this.lastMouse.x = screenX;
@@ -310,7 +342,7 @@ export default {
             const box = this.$refs.stats.getBoundingClientRect();
 
             this.popover.left = Math.min(
-                this.lastHoverPoint.x + this.margin.left + 2,
+                this.lastHoverPoint.x + this.margin.left + 4,
                 container.width - box.width
             );
             this.popover.top = Math.max(0, pageY - container.y - box.height);
