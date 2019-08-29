@@ -22,8 +22,8 @@
 </template>
 
 <style scoped>
-.tbl{
-  height: fit-content;
+.tbl {
+    height: fit-content;
 }
 </style>
 
